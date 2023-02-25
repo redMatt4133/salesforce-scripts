@@ -1,5 +1,5 @@
 """
-    Install Salesforce CLI and append it your environment path.
+    Install Salesforce CLI and append it to your environment path before running this script.
 """
 import argparse
 import logging
@@ -37,7 +37,7 @@ def make_temp_file(url):
 
 def run_command(cmd):
     """
-        Function to read the command using the shell
+        Function to run the command using the native shell
     """
     try:
         subprocess.run(cmd, check=True, shell=True)
