@@ -25,9 +25,9 @@ def check_single_package_dir(directory):
     try:
         # if the default key is present, it cannot be set to false
         if directory[0]['default'] is False:
-            sys.exit('ERROR: The JSON file must include 1 default package directory. \
-                        Because your JSON file contains only 1 directory, it must be the default. \
-                        Change false to true for default or remove the default key.')
+            sys.exit('ERROR: The JSON file must include 1 default package directory. ' +\
+                        'Because your JSON file contains only 1 directory, it must be the default. ' + \
+                        'Change false to true for default or remove the default key.')
     # the default key can be omitted if there is only 1 directory
     except KeyError:
         pass
@@ -40,19 +40,20 @@ def check_multiple_package_dir(directories):
     """
         Function to check multiple directories and confirm only 1 is the default.
     """
-    # initialize a count
+    # initialize a count and set local default path to None
     default_cnt = 0
+    default_path = None
     for directory in directories:
         try:
             if directory['default'] is True:
-                path = directory['path']
+                default_path = directory['path']
                 default_cnt += 1
         except KeyError:
             pass
     # confirm there is only 1 default directory
     if default_cnt > 1:
         sys.exit('ERROR: There can only be 1 default package directory.')
-    return path
+    return default_path
 
 def set_default_package_dir(directories):
     """
