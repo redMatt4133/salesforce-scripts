@@ -51,7 +51,7 @@ def remove_spaces(string):
 
 def main(tests, manifest, wait, validate, debug):
     """
-        Main function to authenticate to Salesforce.
+        Main function to deploy metadata to Salesforce.
     """
     # Define the command
     if tests and not tests.isspace():
