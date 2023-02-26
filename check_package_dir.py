@@ -18,7 +18,7 @@ def parse_args():
     return args
 
 
-def check_single_package_dir(directory):
+def check_single_package_dir(directory, default_path):
     """
         Function to confirm the single package directory is the default.
     """
@@ -26,23 +26,22 @@ def check_single_package_dir(directory):
         # if the default key is present, it cannot be set to false
         if directory[0]['default'] is False:
             sys.exit('ERROR: The JSON file must include 1 default package directory. ' +\
-                        'Because your JSON file contains only 1 directory, it must be the default. ' + \
+                        'Because your JSON file contains only 1 directory, it must be the default. ' +\
                         'Change false to true for default or remove the default key.')
     # the default key can be omitted if there is only 1 directory
     except KeyError:
         pass
     # set the path if the directory passes error validation
-    path = directory[0]['path']
-    return path
+    default_path = directory[0]['path']
+    return default_path
 
 
-def check_multiple_package_dir(directories):
+def check_multiple_package_dir(directories, default_path):
     """
         Function to check multiple directories and confirm only 1 is the default.
     """
-    # initialize a count and set local default path to None
+    # initialize a count
     default_cnt = 0
-    default_path = None
     for directory in directories:
         try:
             if directory['default'] is True:
@@ -63,9 +62,9 @@ def set_default_package_dir(directories):
 
     # call applicable function based on directory count
     if len(directories) == 1:
-        source_folder = check_single_package_dir(directories)
+        source_folder = check_single_package_dir(directories, source_folder)
     else:
-        source_folder = check_multiple_package_dir(directories)
+        source_folder = check_multiple_package_dir(directories, source_folder)
     return source_folder
 
 
