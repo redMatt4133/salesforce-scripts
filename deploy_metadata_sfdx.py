@@ -69,7 +69,7 @@ def run_command(cmd):
     except subprocess.CalledProcessError as exception:
         logging.warning('Deploy Failed. Check the lines above for the error.')
         # store the exception in the thread object
-        threading.current_thread().exc = exception 
+        threading.current_thread().exc = exception
 
 
 def remove_spaces(string):
@@ -105,7 +105,7 @@ def main(tests, manifest, wait, environment, log, validate, debug):
 
         # wait for deploy to finish
         deploy_thread.join()
-    
+
         # kill read thread if it's still running
         # ex: if package.xml is empty, no ID is created
         if read_thread.is_alive():
