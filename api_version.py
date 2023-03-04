@@ -64,8 +64,12 @@ def update_json_file(latest_version, json_path):
             logging.info('Updating the JSON file to have the latest API version.')
             parsed_json['sourceApiVersion'] = f"{latest_version}"
 
-    with open(os.path.abspath(json_path), 'w', encoding='utf-8') as json_file:
-        json.dump(parsed_json, json_file, indent=4, sort_keys=True)
+        with open(os.path.abspath(json_path), 'w', encoding='utf-8') as json_file:
+            json.dump(parsed_json, json_file, indent=4, sort_keys=True)
+    else:
+        # sourceApiVersion is optional
+        logging.warning('Source API version not found in the JSON file.')
+        sys.exit(1)
 
 
 def main(url, json_file):
