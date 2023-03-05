@@ -19,5 +19,4 @@ def extract_tests(commit_msg):
     # in all cases.
     except AttributeError:
         tests = None
-        pass
     return tests

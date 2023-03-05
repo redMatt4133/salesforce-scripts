@@ -67,7 +67,6 @@ def run_command(cmd):
     try:
         subprocess.run(cmd, check=True, shell=True)
     except subprocess.CalledProcessError as exception:
-        logging.warning('Deploy Failed. Check the lines above for the error.')
         # store the exception in the thread object
         threading.current_thread().exc = exception
 
@@ -87,9 +86,11 @@ def main(tests, manifest, wait, environment, log, validate, debug):
     # Define the command
     if tests and not tests.isspace():
         tests = remove_spaces(tests)
-        command = f'sfdx force:source:deploy -m {manifest} -l RunSpecifiedTests -r {tests} -w {wait} --verbose'
+        command = (f'sfdx force:source:deploy -m {manifest} -l RunSpecifiedTests'
+                    f' -r "{tests}" -w {wait} --verbose')
     else:
-        command = f'sfdx force:source:deploy -m {manifest} -l RunSpecifiedTests -r "not,a,test" -w {wait} --verbose'
+        command = (f'sfdx force:source:deploy -m {manifest} -l RunSpecifiedTests'
+                   f' -r "not,a,test" -w {wait} --verbose')
 
     # Append '-c' flag to run a validation deployment
     if validate:

@@ -42,7 +42,6 @@ def run_command(cmd):
     try:
         subprocess.run(cmd, check=True, shell=True)
     except subprocess.CalledProcessError:
-        logging.warning('Authentication failed. Check the lines above for the error.')
         sys.exit(1)
 
 
@@ -56,7 +55,8 @@ def main(alias, url):
     # Set all commands
     # Do not expose the URL in the logs
     commands = []
-    commands.append(f'sfdx force:auth:sfdxurl:store --sfdxurlfile {url_file} --setalias {alias} --json > /dev/null')
+    commands.append(f'sfdx force:auth:sfdxurl:store --sfdxurlfile {url_file}'
+                    f' --setalias {alias} --json > /dev/null')
     commands.append(f'sfdx force:config:set defaultusername={alias}')
     commands.append(f'sfdx force:config:set defaultdevhubusername={alias}')
 

@@ -26,8 +26,7 @@ def check_single_package_dir(directory, default_path):
         # if the default key is present, it cannot be set to false
         if directory[0]['default'] is False:
             sys.exit('ERROR: The JSON file must include 1 default package directory. ' +\
-                        'Because your JSON file contains only 1 directory, it must be the default. ' +\
-                        'Change false to true for default or remove the default key.')
+                        'Set default to True or remove the default key.')
     # the default key can be omitted if there is only 1 directory
     except KeyError:
         pass
