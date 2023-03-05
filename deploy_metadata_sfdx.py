@@ -93,7 +93,7 @@ def main(tests, manifest, wait, environment, log, validate, debug):
 
     # Append '-c' flag to run a validation deployment
     if validate:
-        command = command + ' -c'
+        command += ' -c'
 
     if not debug:
         logging.info(command)
@@ -120,4 +120,5 @@ def main(tests, manifest, wait, environment, log, validate, debug):
 
 if __name__ == '__main__':
     inputs = parse_args()
-    main(inputs.tests, inputs.manifest, inputs.wait, inputs.environment, inputs.log, inputs.validate, inputs.debug)
+    main(inputs.tests, inputs.manifest, inputs.wait, inputs.environment,
+         inputs.log, inputs.validate, inputs.debug)
