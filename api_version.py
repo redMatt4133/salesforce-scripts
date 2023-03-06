@@ -79,6 +79,8 @@ def main(url, json_file):
     """
     latest_api_version = find_latest_version(url)
     logging.info('The latest API version is: %s', latest_api_version)
+    # Print variable so it can be stored in a variable
+    print(latest_api_version)
     update_json_file(latest_api_version, json_file)
 
 
