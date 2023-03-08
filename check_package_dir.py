@@ -71,7 +71,10 @@ def main(json_file):
     """
         Main function to return the package directory path.
     """
-    package_directories = json_file.get('packageDirectories')
+    with open(os.path.abspath(json_file), encoding='utf-8') as file:
+        parsed_json = json.load(file)
+
+    package_directories = parsed_json.get('packageDirectories')
 
     if package_directories:
         # set the default directory path
@@ -79,15 +82,11 @@ def main(json_file):
 
         if dir_path is None:
             sys.exit('ERROR: Default package directory not found.')
-
-        # print the path to use in a terminal
-        print(dir_path)
     else:
         sys.exit('ERROR: Package directories not specified in the JSON file.')
+    return dir_path
 
 
 if __name__ == '__main__':
     inputs = parse_args()
-    with open(os.path.abspath(inputs.file), encoding='utf-8') as file:
-        parsed_json = json.load(file)
-    main(parsed_json)
+    main(inputs.file)
