@@ -10,6 +10,7 @@ import urllib.request
 
 # import local scripts
 import check_package_dir
+import merge_manual_package
 import metadata_types
 import package_template
 
@@ -104,6 +105,7 @@ def find_component_types(file_path):
             member = subdirname + os.sep + name.split('.')[0]
     return (component_type, member, ext, file_path)
 
+
 def build_type_items(file_list):
     """
         build the type items
@@ -151,6 +153,8 @@ def main(from_ref, to_ref, auth, project_server, project_id, json_file):
     updated_files = parse_json_response(response)
     metadata_files = find_metadata_file(updated_files, json_file)
     changed = build_type_items(metadata_files)
+    # import and merge manual package.xml with auto delta XML if desired
+    changed = merge_manual_package.parse_manual_package('manifest/package.xml', changed)
     create_package_xml(changed)
 
 
