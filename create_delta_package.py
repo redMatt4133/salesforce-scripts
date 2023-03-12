@@ -6,35 +6,41 @@ import argparse
 import json
 import logging
 import os
+import re
 import urllib.request
 
 # import local scripts
+import custom_labels
 import check_package_dir
 import merge_manual_package
 import metadata_types
 import package_template
 
-# format logger
+# Format logging message
 logging.basicConfig(format='%(message)s', level=logging.DEBUG)
 
 
 def parse_args():
     """
-        Function to parse required arguments.
-        from_ref - previous commit or baseline branch ($CI_COMMI_SHA_BEFORE)
-        to_ref - current commit or branch ($CI_COMMIT_SHA)
-        authenticate - access token for the API call
-        server - $CI_SERVER_HOST
-        id - $CI_PROJECT_ID
+        Function to pass required arguments.
+        from_ref - previous commit or baseline branch $CI_COMMIT_BEFORE_SHA
+        to_ref - current commit or new branch $CI_COMMIT_SHA
+        authenticate - access token
+        server - CI_SERVER_HOST
+        id - CI_PROJECT_ID
         json - sfdx-project.json
+        delta - delta file created by this script
+        manifest - manual manifest file to merge with delta
     """
-    parser = argparse.ArgumentParser(description='A script to determine the latest API version.')
+    parser = argparse.ArgumentParser(description='A script to generate the delta package.')
     parser.add_argument('-f', '--from_ref')
     parser.add_argument('-t', '--to_ref')
     parser.add_argument('-a', '--authenticate')
     parser.add_argument('-s', '--server')
     parser.add_argument('-i', '--id')
     parser.add_argument('-j', '--json', default='./sfdx-project.json')
+    parser.add_argument('-d', '--delta', default='delta.xml')
+    parser.add_argument('-m', '--manifest', default='manifest/package.xml')
     args = parser.parse_args()
     return args
 
@@ -43,23 +49,23 @@ def api_request(source_ref, to_ref, auth, project_server, project_id):
     """
         Function to open the URL and load as a JSON
     """
-    # set up the GitLab API request
+    # Set up the GitLab API request
     repo_url = f'https://{project_server}/api/v4/projects/{project_id}/repository/'
-    compare_url = repo_url + f"compare?from={source_ref}&to={to_ref}"
-    headers = {"PRIVATE TOKEN": auth}
+    url = repo_url + f"compare?from={source_ref}&to={to_ref}"
+    headers = {"PRIVATE-TOKEN": auth}
 
-    # make the API request and parse as a JSON
-    req = urllib.request.Request(compare_url, headers=headers)
+    # Make the API request and parse the response as a JSON
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req) as json_file:
         data = json.loads(json_file.read().decode('utf8'))
     return data
 
 
-def parse_json_response(diff_data):
+def parse_response(diff_data):
     """
-        Append all changed files to an array.
+        Append all changed files to an array
     """
-    logging.info('New and modified files:')
+    logging.info('New/modified files:')
     new_files = []
     for diff in diff_data["diffs"]:
         logging.info(diff['new_path'])
@@ -67,10 +73,10 @@ def parse_json_response(diff_data):
     return new_files
 
 
-def find_metadata_file(changed_files, json_file):
+def find_metadata_files(changed_files, json_file):
     """
-        Determine which changed files are Salesforce metadata
-        Use the check_package_dir script
+        Determine metadata source folder with other script
+        and then confirm changed files are inside that path
     """
     source_folder = check_package_dir.main(json_file)
     metadata_changes = []
@@ -80,85 +86,117 @@ def find_metadata_file(changed_files, json_file):
     return metadata_changes
 
 
-def find_component_types(file_path):
+def find_component_type(file_path):
     """
-        find the component type using the imported
-        dictionary
+        Find the component type using 
+        the imported dictionary
     """
+    #dir_name = os.path.dirname(file_path)
     base_name = os.path.basename(file_path)
-    name, ext = os.path.splitext(base_name)
+    # split base name by name and extension
+    # not using "name, ext = os.path.splittext" since we
+    # don't need to use the file extension at the moment
+    name_ext = os.path.splitext(base_name)
     subdirname = os.path.basename(os.path.dirname(file_path))
 
     component_type = ''
     member = ''
 
-    # iterate over all keys in the dict
-    # value un-used but declared to remove Pylint suggestion
+    # iterate through all keys in the dictionary
+    # using .items() to remove Pylint suggestion over .keys()
     # "consider-using-dict-items / C0206 - Consider iterating with .items()"
-    for key, value in metadata_types.metadata_Types.items():
+    for keyvalue in metadata_types.metadata_Types.items():
+        key = keyvalue[0]
         search_for = '/' + key + '/'
         if search_for in file_path:
             component_type = metadata_types.metadata_Types[key]
-            member = name.split('.')[0]
-        # include the parent folder for specific items as noted in the dict
+            member = (name_ext[0].split('.')[0],)
+        # Include the parent folder for specific items
         if component_type in metadata_types.inside_Folder:
-            member = subdirname + os.sep + name.split('.')[0]
-    return (component_type, member, ext, file_path)
+            member =  (subdirname + os.sep + name_ext[0].split('.')[0],)
+        # If the component type has child items, check if metadata falls under
+        # the child item and overwrite the component type if it does
+        if component_type in metadata_types.has_child_Items:
+            for child_types in metadata_types.has_child_Items[component_type]:
+                if child_types.get(subdirname):
+                    component_type = child_types[subdirname]
+                    # find the parent object to append to member name
+                    parent_object = re.search(fr"{search_for}(\w+)/", file_path).group(1)
+                    member = (f'{parent_object}.{member[0]}',)
+                    break
+        # Check inside the file for specific items
+        if component_type in metadata_types.inside_File:
+            component_type, member = custom_labels.parse_custom_labels(file_path)
+    return (component_type, member)
 
 
 def build_type_items(file_list):
     """
-        build the type items
+        Build type items.
     """
     changed = {}
     for filename in file_list:
-        (component_type, member, ext, file_path) = find_component_types(filename)
+        (component_type, member) = find_component_type(filename)
         if (component_type is not None and len(component_type.strip()) > 0) :
-            if component_type in changed and changed[component_type] is not None:
-                changed[component_type].add(member)
-            else:
+            # if member tuple is greater than 1, add the first 1 by setting the type
+            # then, add the remaining items
+            if len(member) > 1:
                 changed.update({component_type : set()})
-                changed[component_type].add(member)
+                changed[component_type].add(member[0])
+                for member_item in member[1:]:
+                    changed[component_type].add(member_item)
+            elif component_type in changed and changed[component_type] is not None:
+                for member_item in member:
+                    changed[component_type].add(member_item)
+            else:
+                for member_item in member:
+                    changed.update({component_type : set()})
+                    changed[component_type].add(member_item)
     return changed
 
 
-def create_package_xml(items):
+def create_package_xml(items, delta_file):
     """
-        create the package.xml file
+        Create the package.xml file
     """
-    # initialize the package with the header
-    package_contents = package_template.PACKAGE_HEADER
+    # Initialize the package contents with the header
+    package_contents = package_template.PKG_HEADER
 
-    # append each item to the package, if any
+    # Append each item to the package
+    #    <types>
+    #       <name>ApexClass</name>
+    #       <members>ProjectTaskTriggerHandler</members>
+    #    </types>
     for key in items:
         package_contents += "\t<types>\n"
-        package_contents += "\t\t<name>" + key + "</name>\n"
         for member in items[key]:
             package_contents += "\t\t<members>" + member + "</members>\n"
+        package_contents += "\t\t<name>" + key + "</name>\n"
         package_contents += "\t</types>\n"
-    # append the footer
-    package_contents += package_template.PACKAGE_FOOTER
-    package_path = 'package.xml'
-    logging.info('Delta package:')
+    # Append the footer to the package
+    package_contents += package_template.PKG_FOOTER
+    logging.info('Auto-generated delta package:')
     logging.info(package_contents)
-    with open(package_path, 'w', encoding='utf-8') as package_file:
+    with open(delta_file, 'w', encoding='utf-8') as package_file:
         package_file.write(package_contents)
 
 
-def main(from_ref, to_ref, auth, project_server, project_id, json_file):
+def main(source, to_ref, auth, project_server, project_id, json_file, delta, manifest):
     """
-        Main function to take the diff and build the package.xml
+        Main function to take the diff and
+        build the package.xml file.
     """
-    response = api_request(from_ref, to_ref, auth, project_server, project_id)
-    updated_files = parse_json_response(response)
-    metadata_files = find_metadata_file(updated_files, json_file)
+    response = api_request(source, to_ref, auth, project_server, project_id)
+    updated_files = parse_response(response)
+    metadata_files = find_metadata_files(updated_files, json_file)
     changed = build_type_items(metadata_files)
-    # import and merge manual package.xml with auto delta XML if desired
-    changed = merge_manual_package.parse_manual_package('manifest/package.xml', changed)
-    create_package_xml(changed)
+    # merge manual package.xml if required
+    changed = merge_manual_package.parse_manual_package(manifest, changed)
+    create_package_xml(changed, delta)
 
 
 if __name__ == '__main__':
     inputs = parse_args()
     main(inputs.from_ref, inputs.to_ref, inputs.authenticate,
-         inputs.server, inputs.id, inputs.json)
+         inputs.server, inputs.id, inputs.json,
+         inputs.delta, inputs.manifest)
