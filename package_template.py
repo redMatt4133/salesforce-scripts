@@ -4,11 +4,12 @@
 """
 from api_version import find_latest_version
 
-API_VERSION = find_latest_version('https://my.salesforce.com/services/data')
+API_VERSION = find_latest_version('https://my.salesforce.com/services/data/')
 
-PACKAGE_HEADER = f'''<<?xml version"1.0" encoding="UTF-8" standalone="yes"?>
+PKG_HEADER = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
-    <version>{API_VERSION}</version>
 '''
 
-PACKAGE_FOOTER = "</Package>"
+PKG_FOOTER = f'''\t<version>{API_VERSION}</version>
+</Package>
+'''
