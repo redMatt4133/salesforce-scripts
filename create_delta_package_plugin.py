@@ -9,6 +9,7 @@ import re
 import subprocess
 import xml.etree.ElementTree as ET
 
+# import local script
 import package_template
 
 # Format logging message
@@ -27,9 +28,9 @@ def parse_args():
         manifest - manual manifest file in this repo
         combined - package.xml with delta and manifest updates combined
     """
-    parser=argparse.ArgumentParser(description='A script to deploy metadata to salesforce.')
-    parser.add_argument('-f', '--from_ref', default='d0e39d26')
-    parser.add_argument('-t', '--to_ref', default='182d802d')
+    parser=argparse.ArgumentParser(description='A script to build the package.xml')
+    parser.add_argument('-f', '--from_ref')
+    parser.add_argument('-t', '--to_ref')
     parser.add_argument('-d', '--delta', default='package/package.xml')
     parser.add_argument('-m', '--manifest', default='manifest/package.xml')
     parser.add_argument('-c', '--combined', default='delta.xml')
