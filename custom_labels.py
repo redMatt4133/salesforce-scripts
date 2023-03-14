@@ -23,6 +23,9 @@ def parse_custom_labels(label_file, diffs):
     for line in diff_lines:
         # space needed after + to not get the file name line the starts with +++
         if line.startswith('+ '):
+            # can't get anything useful with label tag
+            if 'labels' in line:
+                continue
             # add net new label
             if 'fullName' in line:
                 labelname = re.search(r'>(.*?)<', line, flags=0).group(1)
@@ -35,7 +38,10 @@ def parse_custom_labels(label_file, diffs):
                 textinside = re.search(r'>(.*?)<', line, flags=0).group(1)
                 parentelement = root.findall(f".//sforce:labels[sforce:{elementname}='{textinside}']", ns)
                 if parentelement is not None:
-                    members.append((parentelement[0].find('sforce:fullName', ns)).text)
+                    try:
+                        members.append((parentelement[0].find('sforce:fullName', ns)).text)
+                    except IndexError:
+                        pass
     # convert list to tuple
     members = tuple(members)
     return component_type, members
