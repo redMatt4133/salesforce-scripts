@@ -27,7 +27,7 @@ def parse_custom_labels(label_file, diffs):
             if 'labels' in line:
                 continue
             # add net new label
-            if 'fullName' in line:
+            elif 'fullName' in line:
                 labelname = re.search(r'>(.*?)<', line, flags=0).group(1)
                 members.append(labelname)
             # find corresponding full name label if another element changed
