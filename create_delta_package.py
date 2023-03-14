@@ -1,13 +1,14 @@
 """
-    Salesforce delta package script.
-    Uses the GitLab API to take the diff of two commits.
+    Script which takes the git diff and
+    creates the package.xml
+    Requires Git Bash.
 """
 import argparse
 import json
 import logging
 import os
 import re
-import urllib.request
+import subprocess
 
 # import local scripts
 import custom_labels
@@ -25,9 +26,6 @@ def parse_args():
         Function to pass required arguments.
         from_ref - previous commit or baseline branch $CI_COMMIT_BEFORE_SHA
         to_ref - current commit or new branch $CI_COMMIT_SHA
-        authenticate - access token
-        server - CI_SERVER_HOST
-        id - CI_PROJECT_ID
         json - sfdx-project.json
         delta - delta file created by this script
         manifest - manual manifest file to merge with delta
@@ -35,9 +33,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description='A script to generate the delta package.')
     parser.add_argument('-f', '--from_ref')
     parser.add_argument('-t', '--to_ref')
-    parser.add_argument('-a', '--authenticate')
-    parser.add_argument('-s', '--server')
-    parser.add_argument('-i', '--id')
     parser.add_argument('-j', '--json', default='./sfdx-project.json')
     parser.add_argument('-d', '--delta', default='delta.xml')
     parser.add_argument('-m', '--manifest', default='manifest/package.xml')
@@ -45,32 +40,28 @@ def parse_args():
     return args
 
 
-def api_request(source_ref, to_ref, auth, project_server, project_id):
+def take_git_diff(from_ref, to_ref):
     """
-        Function to open the URL and load as a JSON
+        Function to take the diff and create
+        a dictionary of changes.
     """
-    # Set up the GitLab API request
-    repo_url = f'https://{project_server}/api/v4/projects/{project_id}/repository/'
-    url = repo_url + f"compare?from={source_ref}&to={to_ref}"
-    headers = {"PRIVATE-TOKEN": auth}
+    # Take the diff and store the output
+    command = f'git diff {from_ref}..{to_ref}'
+    output = subprocess.run(command, stdout=subprocess.PIPE, universal_newlines=True,
+                            check=True, shell=True)
 
-    # Make the API request and parse the response as a JSON
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req) as json_file:
-        data = json.loads(json_file.read().decode('utf8'))
-    return data
+    # Split the output into a list of file diffs
+    file_diffs = output.stdout.strip().split('diff --git ')
 
+    # Define an empty dictionary to store the changed files
+    changed_files = {}
 
-def parse_response(diff_data):
-    """
-        Append all changed files to an array
-    """
-    logging.info('New/modified files:')
-    new_files = []
-    for diff in diff_data["diffs"]:
-        logging.info(diff['new_path'])
-        new_files.append(diff['new_path'])
-    return new_files
+    for file_diff in file_diffs[1:]:
+        # Extract the file name from the diff
+        file_name = file_diff.split('\n')[0].split(' b/')[1]
+        # Add the file diff to the dictionary
+        changed_files[file_name] = file_diff
+    return changed_files
 
 
 def find_metadata_files(changed_files, json_file):
@@ -80,13 +71,14 @@ def find_metadata_files(changed_files, json_file):
     """
     source_folder = check_package_dir.main(json_file)
     metadata_changes = []
-    for change_file in changed_files:
-        if source_folder in change_file:
-            metadata_changes.append(change_file)
+    for change_file in changed_files.items():
+        # if source folder is in the key, append the file
+        if source_folder in change_file[0]:
+            metadata_changes.append(change_file[0])
     return metadata_changes
 
 
-def find_component_type(file_path):
+def find_component_type(file_path, diffs):
     """
         Find the component type using 
         the imported dictionary
@@ -126,17 +118,17 @@ def find_component_type(file_path):
                     break
         # Check inside the file for specific items
         if component_type in metadata_types.inside_File:
-            component_type, member = custom_labels.parse_custom_labels(file_path)
+            component_type, member = custom_labels.parse_custom_labels(file_path, diffs)
     return (component_type, member)
 
 
-def build_type_items(file_list):
+def build_type_items(file_list, diffs):
     """
         Build type items.
     """
     changed = {}
     for filename in file_list:
-        (component_type, member) = find_component_type(filename)
+        (component_type, member) = find_component_type(filename, diffs)
         if (component_type is not None and len(component_type.strip()) > 0) :
             # if member tuple is greater than 1, add the first 1 by setting the type
             # then, add the remaining items
@@ -181,15 +173,14 @@ def create_package_xml(items, delta_file):
         package_file.write(package_contents)
 
 
-def main(source, to_ref, auth, project_server, project_id, json_file, delta, manifest):
+def main(source, to_ref, json_file, delta, manifest):
     """
         Main function to take the diff and
         build the package.xml file.
     """
-    response = api_request(source, to_ref, auth, project_server, project_id)
-    updated_files = parse_response(response)
+    updated_files = take_git_diff(source, to_ref)
     metadata_files = find_metadata_files(updated_files, json_file)
-    changed = build_type_items(metadata_files)
+    changed = build_type_items(metadata_files, updated_files)
     # merge manual package.xml if required
     changed = merge_manual_package.parse_manual_package(manifest, changed)
     create_package_xml(changed, delta)
@@ -197,6 +188,5 @@ def main(source, to_ref, auth, project_server, project_id, json_file, delta, man
 
 if __name__ == '__main__':
     inputs = parse_args()
-    main(inputs.from_ref, inputs.to_ref, inputs.authenticate,
-         inputs.server, inputs.id, inputs.json,
-         inputs.delta, inputs.manifest)
+    main(inputs.from_ref, inputs.to_ref,
+         inputs.json, inputs.delta, inputs.manifest)
